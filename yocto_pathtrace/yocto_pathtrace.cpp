@@ -1192,6 +1192,10 @@ static float SafeSqrt(float x) {
     return sqrt(x);
 }
 
+static float norm_vec(vec3f v){
+  return sqrt(rec_pow(v.x,2)+rec_pow(v.y,2)+rec_pow(v.z,2));
+}
+
 
 // Path tracing.
 static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
@@ -1233,6 +1237,10 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       // accumulate emission
       radiance += weight * eval_emission(emission, normal, outgoing);
 
+      //Hair Parameters 
+      auto eta=1.55f;
+      auto cosGamma= dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
+      auto h= sqrt(1-rec_pow(cosGamma,2));
       // next direction
       auto incoming = zero3f;
       if (!is_delta(brdf)) {
@@ -1250,17 +1258,6 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
         incoming = sample_delta(brdf, normal, outgoing, rand1f(rng));
         weight *= eval_delta(brdf, normal, outgoing, incoming) /
                   sample_delta_pdf(brdf, normal, outgoing, incoming);
-      }
-
-      // update volume stack
-      if (has_volume(object) &&
-          dot(normal, outgoing) * dot(normal, incoming) < 0) {
-        if (volume_stack.empty()) {
-          auto volpoint = eval_vsdf(object, element, uv);
-          volume_stack.push_back(volpoint);
-        } else {
-          volume_stack.pop_back();
-        }
       }
 
       // setup next iteration
