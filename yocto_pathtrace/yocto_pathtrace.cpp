@@ -1211,22 +1211,7 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       radiance += weight * eval_environment(scene, ray);
       break;
     }
-
-    // handle transmission if inside a volume
-    auto in_volume = false;
-    if (!volume_stack.empty()) {
-      auto& vsdf     = volume_stack.back();
-      auto  distance = sample_transmittance(
-          vsdf.density, intersection.distance, rand1f(rng), rand1f(rng));
-      weight *= eval_transmittance(vsdf.density, distance) /
-                sample_transmittance_pdf(
-                    vsdf.density, distance, intersection.distance);
-      in_volume             = distance < intersection.distance;
-      intersection.distance = distance;
-    }
-
     // switch between surface and volume
-    if (!in_volume) {
       // prepare shading point
       auto outgoing = -ray.d;
       auto object   = scene->objects[intersection.object];
@@ -1279,46 +1264,8 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       }
 
       // setup next iteration
-      ray = {position, incoming};
-    } else {
-      // prepare shading point
-      auto  outgoing = -ray.d;
-      auto  position = ray.o + ray.d * intersection.distance;
-      auto& vsdf     = volume_stack.back();
-
-      // handle opacity
-      hit = true;
-
-      // accumulate emission
-      // radiance += weight * eval_volemission(vsdf, outgoing);
-
-      // next direction
-      auto incoming = zero3f;
-      if (rand1f(rng) < 0.5f) {
-        incoming = sample_scattering(vsdf, outgoing, rand1f(rng), rand2f(rng));
-      } else {
-        incoming = sample_lights(
-            scene, position, rand1f(rng), rand1f(rng), rand2f(rng));
-      }
-      weight *= eval_scattering(vsdf, outgoing, incoming) /
-                (0.5f * sample_scattering_pdf(vsdf, outgoing, incoming) +
-                    0.5f * sample_lights_pdf(scene, position, incoming));
-
-      // setup next iteration
-      ray = {position, incoming};
-    }
-
-    // check weight
-    if (weight == zero3f || !isfinite(weight)) break;
-
-    // russian roulette
-    if (bounce > 3) {
-      auto rr_prob = min((float)0.99, max(weight));
-      if (rand1f(rng) >= rr_prob) break;
-      weight *= 1 / rr_prob;
-    }
+      ray = {position, incoming}; 
   }
-
   return {radiance, hit ? 1.0f : 0.0f};
 }
 
