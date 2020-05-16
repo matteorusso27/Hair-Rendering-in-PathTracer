@@ -1158,6 +1158,41 @@ static float sample_scattering_pdf(
   return sample_phasefunction_pdf(vsdf.anisotropy, outgoing, incoming);
 }
 
+//POWER FUNCTION
+static float rec_pow(float v,int n) {
+    if(n==0)return 1;
+    if(n%2==0){
+        float y=rec_pow(v,n/2);
+        return y*y;
+    }
+    else
+    {
+        return v*pow(v,n-1);
+    }
+}
+
+//CLAMP
+static float clamping(float a, float min_, float max_) {
+  return min(max(a, min_), max_);
+}
+
+//ARCOSINE
+static float SafeASin(float x) {
+    if(x >= -1.0001 && x <= 1.0001)
+    return asin(clamping(x, -1, 1));
+    else{
+        return asin(x);
+    }
+}
+
+//SQRT
+static float SafeSqrt(float x) {
+    if(x >= -1e-4)
+        return sqrt(max(float(0), x));
+    return sqrt(x);
+}
+
+
 // Path tracing.
 static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
     rng_state& rng, const trace_params& params) {
