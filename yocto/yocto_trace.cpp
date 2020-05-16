@@ -1947,7 +1947,7 @@ static float sample_lights_pdf(
   return pdf;
 }
 
-//POWER FUNCTION
+//POWER FUNCTION guantanamela
 static float rec_pow(float v,int n) {
     if(n==0)return 1;
     if(n%2==0){
