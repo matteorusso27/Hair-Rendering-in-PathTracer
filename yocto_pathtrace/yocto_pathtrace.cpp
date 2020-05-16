@@ -1238,9 +1238,12 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       radiance += weight * eval_emission(emission, normal, outgoing);
 
       //Hair Parameters 
-      auto eta=1.55f;
-      auto cosGamma= dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
-      auto h= sqrt(1-rec_pow(cosGamma,2));
+      auto eta =1.55f;
+      auto cosGamma = dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
+      auto h = sqrt(1-rec_pow(cosGamma,2));
+
+
+
       // next direction
       auto incoming = zero3f;
       if (!is_delta(brdf)) {
