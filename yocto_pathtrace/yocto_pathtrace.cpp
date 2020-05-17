@@ -35,6 +35,7 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <numeric>
 using namespace std::string_literals;
 
 // -----------------------------------------------------------------------------
@@ -60,6 +61,7 @@ using math::make_rng;
 using math::max;
 using math::min;
 using math::pif;
+using math::pi;
 using math::pow;
 using math::sample_discrete_cdf;
 using math::sample_discrete_cdf_pdf;
@@ -1200,6 +1202,27 @@ auto eta=1.55f;
 auto sigma_a=0;
 auto pMax=3;
 auto alpha=2;
+float beta_n=0.3f;
+float beta_m=0.3f;
+float *v=long_var(beta_m);
+
+// <Compute longitudinal variance from β_m >
+inline float* long_var(float b_m){
+  float *v= new float[pMax+1];
+  v[0] = rec_pow((0.726f * beta_m + 0.812f * rec_pow((beta_m),2) +
+	3.7f * rec_pow((beta_m),20)),2);
+	v[1] = .25 * v[0];
+	v[2] = 4 * v[0];
+	for (int p = 3; p <= pMax; ++p)
+	  v[p] = v[2];
+  return v;
+}
+
+// <Compute azimuthal logistic scale factor from β_n>
+	static const float SqrtPiOver8 = 0.626657069f;
+
+	float s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * Sqr(beta_n) +
+		5.372f * Pow<22>(beta_n));
 
 
 static void alpha_values(float cos2kAlpha[3],float sin2kAlpha[3]){
@@ -1234,9 +1257,10 @@ float FrDielectric(float cosThetaI, float etaI, float etaT) {
     return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
+// ------------AP --------------//
 static float* Ap(float cosThetaO, float eta, float h, float T ) {
   
-  float ap[pMax+1];
+  float*ap = new float[pMax+1];
 	
 	// <Compute p = 0 attenuation at initial cylinder intersection>
 		float cosGammaO = SafeSqrt(1 - h * h);
@@ -1255,10 +1279,81 @@ static float* Ap(float cosThetaO, float eta, float h, float T ) {
 	return ap;
 }
 
+inline float I0(float x) {
+    float val = 0;
+    float x2i = 1;
+    int64_t ifact = 1;
+    int i4 = 1;
+    // I0(x) \approx Sum_i x^(2i) / (4^i (i!)^2)
+    for (int i = 0; i < 10; ++i) {
+        if (i > 1) ifact *= i;
+        val += x2i / (i4 * rec_pow((ifact),2));
+        x2i *= x * x;
+        i4 *= 4;
+    }
+    return val;
+}
+
+inline float LogI0(float x) {
+    if (x > 12)
+        return x + 0.5 * (-std::log(2 * math::pi) + std::log(1 / x) + 1 / (8 * x));
+    else
+        return std::log(I0(x));
+}
+
+// --------------MP ----------------//
+float Mp(float cosThetaI, float cosThetaO, float sinThetaI,
+	float sinThetaO, float v) {
+
+	float a = cosThetaI * cosThetaO / v;
+	float b = sinThetaI * sinThetaO / v;
+	float mp = (v <= .1) ?
+	(std::exp(LogI0(a) - b - 1/v + 0.6931f + std::log(1 / (2*v)))) :
+	(std::exp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
+	return mp;
+}
+
+// <Azimuthal Scattering>
+
+float Phi(int p, float gammaO, float gammaT) {
+return 2 * p * gammaT - 2 * gammaO + p * math::pi;
+}
+
+inline float Logistic(float x, float s) {
+x = std::abs(x);
+return std::exp(-x / s) / (s * rec_pow((1 + std::exp(-x / s)),2));
+}
+
+inline float LogisticCDF(float x, float s) {
+return 1 / (1 + std::exp(-x / s));
+}
+
+inline float TrimmedLogistic(float x, float s, float a, float b) {
+return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
+}
+
+inline float Np(float phi, int p, float s, float gammaO,
+		float gammaT) {
+	float dphi = phi - Phi(p, gammaO, gammaT);
+	// <Remap dphi to [−π, π]>
+		while (dphi > pi) dphi -= 2 * pi;
+		while (dphi < -pi) dphi += 2 * pi;
+	return TrimmedLogistic(dphi, s, -pi, pi);
+}
+
+float h=0.f;
+float T=0.f;
+
+
 //BRDF 
-static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
+static float eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
+  
   auto cosGamma = dot(normal,wo)/(norm_vec(normal)*norm_vec(wo));
-  auto h = sqrt(1-rec_pow(cosGamma,2));
+  h = sqrt(1-rec_pow(cosGamma,2));
+  float cosGamma0=SafeSqrt(1-h*h);
+  float sinGamma0=SafeSqrt(1-cosGamma0*cosGamma0);
+
+  float gamma0=SafeASin(sinGamma0);
 // <Compute hair coordinate system terms related to wo>
 	float sinThetaO = wo.x;
 	float cosThetaO = SafeSqrt(1 - rec_pow(sinThetaO , 2));
@@ -1285,8 +1380,8 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
 // <Evaluate hair BSDF>
 
 	float phi = phiI - phiO;
-	float ap[pMax+1] = Ap(cosThetaO, eta, h, T);
-  auto fsum   = ptr::brdf{};
+  float *ap=Ap(cosThetaO, eta, h, T);
+  float fsum ;
   float cos2kAlpha[3],sin2kAlpha[3];
   alpha_values(cos2kAlpha,sin2kAlpha);
 	for (int p = 0; p < pMax; ++p) {
@@ -1298,7 +1393,7 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
 			}
 			// <Handle remainder of p values for hair scale tilt>
 				if (p == 1) {
-				//Cambia segno se le cose si fanno avverse - mimmo
+				//Cambia segno se le cose si fanno avverse - mimmo ok
 				sinThetaIp = sinThetaI * cos2kAlpha[0] + cosThetaI *sin2kAlpha[0];
 				cosThetaIp = cosThetaI * cos2kAlpha[0] - sinThetaI * sin2kAlpha[0];
 				}
@@ -1310,14 +1405,28 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
 					cosThetaIp = std::abs(cosThetaIp);
 
 			fsum += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p] *
-			Np(phi, p, s, gammaO, gammaT);
+			Np(phi, p, s, gamma0, gammaT);
 	}
 	// <Compute contribution of remaining terms after pMax>
 		fsum += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
-			ap[pMax] / (2.f * Pi);
+			ap[pMax] / (2.f * pi);
 	
-	if (AbsCosTheta(wi) > 0) fsum /= AbsCosTheta(wi);
+	if (std::abs(wi.z) > 0) fsum /= std::abs(wi.z);
 	return fsum;
+}
+
+// ----------PDF-------------
+// -A p-
+inline float* ComputeApPdf(float cosThetaO){
+	
+	float*ap = Ap(cosThetaO, eta, h, T);
+	// <Compute A p PDF from individual A p terms>
+    float * apPdf=new float[pMax+1];
+		float sumY = std::accumulate(ap.begin(), ap.end(), float(0),
+		[](float s, const Spectrum &ap) { return s + ap.y(); });
+		for (int i = 0; i <= pMax; ++i)
+		apPdf[i] = ap[i].y() / sumY;
+	return apPdf;
 }
 
 
