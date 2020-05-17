@@ -1238,12 +1238,11 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       radiance += weight * eval_emission(emission, normal, outgoing);
 
       //Hair Parameters 
-      auto eta=1.55f;
-      auto cosGamma= dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
-      auto h= sqrt(1-rec_pow(cosGamma,2));
+      auto eta = 1.55f;
+      auto cosGamma = dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
+      auto h = sqrt(1-rec_pow(cosGamma,2));
       // next direction
       auto incoming = zero3f;
-      if (!is_delta(brdf)) {
         if (rand1f(rng) < 0.5f) {
           incoming = sample_brdfcos(
               brdf, normal, outgoing, rand1f(rng), rand2f(rng));
@@ -1254,12 +1253,7 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
         weight *= eval_brdfcos(brdf, normal, outgoing, incoming) /
                   (0.5f * sample_brdfcos_pdf(brdf, normal, outgoing, incoming) +
                       0.5f * sample_lights_pdf(scene, position, incoming));
-      } else {
-        incoming = sample_delta(brdf, normal, outgoing, rand1f(rng));
-        weight *= eval_delta(brdf, normal, outgoing, incoming) /
-                  sample_delta_pdf(brdf, normal, outgoing, incoming);
-      }
-
+      
       // setup next iteration
       ray = {position, incoming}; 
   }
