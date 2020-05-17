@@ -1204,7 +1204,7 @@ auto pMax=3;
 auto alpha=2;
 float beta_n=0.3f;
 float beta_m=0.3f;
-float *v=long_var(beta_m);
+
 
 // <Compute longitudinal variance from β_m >
 inline float* long_var(float b_m){
@@ -1218,11 +1218,13 @@ inline float* long_var(float b_m){
   return v;
 }
 
+float *v=long_var(beta_m);
+
 // <Compute azimuthal logistic scale factor from β_n>
 	static const float SqrtPiOver8 = 0.626657069f;
 
-	float s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * Sqr(beta_n) +
-		5.372f * Pow<22>(beta_n));
+	float s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * rec_pow((beta_n),2) +
+		5.372f *rec_pow((beta_n),22));
 
 
 static void alpha_values(float cos2kAlpha[3],float sin2kAlpha[3]){
@@ -1346,11 +1348,11 @@ inline float Np(float phi, int p, float s, float gammaO,
 }
 
 float h=0.f;
-float T=0.f;
+brdf T;
 
-
+vec3f normal;
 //BRDF 
-static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
+static brdf eval_f(const vec3f &wo, const vec3f &wi){
   
   auto cosGamma = dot(normal,wo)/(norm_vec(normal)*norm_vec(wo));
   h = sqrt(1-rec_pow(cosGamma,2));
@@ -1379,12 +1381,16 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
 	float gammaT = SafeASin(sinGammaT);
 
 // <Compute the transmittance T of a single path through the cylinder>
-	float T = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
+  
+  T.diffuse.x = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
+  T.diffuse.y = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
+  T.diffuse.z = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
+
 
 // <Evaluate hair BSDF>
 
 	float phi = phiI - phiO;
-  float *ap=Ap(cosThetaO, eta, h, T);
+  brdf *ap= Ap(cosThetaO, eta, h, T);
   auto fsum   = ptr::brdf{};
   float cos2kAlpha[3],sin2kAlpha[3];
   alpha_values(cos2kAlpha,sin2kAlpha);
@@ -1410,12 +1416,12 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
 				// <Handle out-of-range cos θ i from scale adjustment>
 					cosThetaIp = std::abs(cosThetaIp);
 
-			fsum.diffuse += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p] *
+			fsum.diffuse += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p].diffuse.x *
 			Np(phi, p, s, gamma0, gammaT);
 	}
 	// <Compute contribution of remaining terms after pMax>
 		fsum.diffuse += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
-			ap[pMax] / (2.f * pi);
+			ap[pMax].diffuse / (2.f * pi);
 	
 	if (std::abs(wi.z) > 0) fsum.diffuse /= std::abs(wi.z);
 	return fsum;
@@ -1423,15 +1429,14 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
 
 // ----------PDF-------------
 // -A p-
-inline float* ComputeApPdf(float cosThetaO){
-	
-	float*ap = Ap(cosThetaO, eta, h, T);
+inline brdf* ComputeApPdf(float cosThetaO){
+	brdf *ap = Ap(cosThetaO, eta, h, T);
 	// <Compute A p PDF from individual A p terms>
-    float * apPdf=new float[pMax+1];
-		float sumY = std::accumulate(ap[0], ap[-1], float(0),
-		[](float s, float &ap) { return s + ap.y(); });
+    brdf * apPdf=new brdf[pMax+1];
+		float sumY = std::accumulate(ap[0].diffuse, ap[-1].diffuse, float(0),
+		[](float s, float &ap) { return s + ap; });
 		for (int i = 0; i <= pMax; ++i)
-		apPdf[i] = ap[i].y() / sumY;
+		apPdf[i].diffuse = ap[i].diffuse/ sumY;
 	return apPdf;
 }
 
@@ -1463,7 +1468,7 @@ float b) {
 }
 
 
- inline float Sample_f(const vec3f &wo, vec3f wi,const vec2f &u2, float*pdf){ //BxDFType *sampledType) {
+ inline float Sample_f(const vec3f &wo, vec3f *wi,const vec2f &u2, float*pdf){ //BxDFType *sampledType) {
 	// <Compute hair coordinate system terms related to wo>
 		float sinThetaO = wo.x;
 		float cosThetaO = SafeSqrt(1 - rec_pow(sinThetaO , 2));
@@ -1471,11 +1476,11 @@ float b) {
 	// <Derive four random samples from u2 >
 		vec2f u[2] = { DemuxFloat(u2[0]), DemuxFloat(u2[1]) };
 	// <Determine which term p to sample for hair scattering>
-    float*  apPdf = ComputeApPdf(cosThetaO);
+    brdf*  apPdf = ComputeApPdf(cosThetaO);
     int p;
 		for (p = 0; p < pMax; ++p) {
-			if (u[0][0] < apPdf[p]) break;
-			u[0][0] -= apPdf[p];
+			if (u[0][0] < apPdf[p].diffuse.x) break;
+			u[0][0] -= apPdf[p].diffuse.x;
 		}
 
     // Rotate $\sin \thetao$ and $\cos \thetao$ to account for hair scale tilt
@@ -1499,16 +1504,16 @@ float b) {
     u[1][0] = std::max(u[1][0], float(1e-5));
     float cosTheta =
         1 + v[p] * std::log(u[1][0] + (1 - u[1][0]) * std::exp(-2 / v[p]));
-    float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
+    float sinTheta = SafeSqrt(1 - rec_pow((cosTheta),2));
     float cosPhi = std::cos(2 * pi * u[1][1]);
     float sinThetaI = -cosTheta * sinThetaOp + sinTheta * cosPhi * cosThetaOp;
-    float cosThetaI = SafeSqrt(1 - Sqr(sinThetaI));
+    float cosThetaI = SafeSqrt(1 - rec_pow((sinThetaI),2));
   //CODICE BBBRUTTO
 	// <Sample N p to compute ∆φ>
 		// <Compute γ t for refracted ray>
-			float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
+			float etap = std::sqrt(eta * eta - rec_pow((sinThetaO),2)) / cosThetaO;
 			float sinGammaT = h / etap;
-			float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
+			float cosGammaT = SafeSqrt(1 - rec_pow((sinGammaT),2));
 			float gammaT = SafeASin(sinGammaT);
 		float dphi;
     float cosGamma0=SafeSqrt(1-h*h);
@@ -1524,7 +1529,7 @@ float b) {
     }
 	// <Compute wi from sampled hair scattering angles>
 		float phiI = phiO + dphi;
-		wi = vec3f(sinThetaI, cosThetaI * std::cos(phiI),cosThetaI * std::sin(phiI));
+		*wi = vec3f(sinThetaI, cosThetaI * std::cos(phiI),cosThetaI * std::sin(phiI));
 	// <Compute PDF for sampled hair scattering direction wi >
 		*pdf = 0;
 		
@@ -1548,13 +1553,12 @@ float b) {
 					// <Handle out-of-range cos θ i from scale adjustment>
 						cosThetaIp = std::abs(cosThetaIp);
 			*pdf += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) *
-			apPdf[p] * Np(dphi, p, s, gamma0, gammaT);
+			apPdf[p].diffuse.x * Np(dphi, p, s, gamma0, gammaT);
 		}
 		*pdf += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
-		apPdf[pMax] * (1 / (2 * pi));
+		apPdf[pMax].diffuse.x * (1 / (2 * pi));
 
-//return f(wo, *wi);
-return pif;
+  return *pdf;
 }
 
 // Path tracing.
@@ -1582,7 +1586,7 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       auto element  = intersection.element;
       auto uv       = intersection.uv;
       auto position = eval_position(object, element, uv);
-      auto normal   = eval_shading_normal(object, element, uv, outgoing);
+       normal   = eval_shading_normal(object, element, uv, outgoing);
       auto emission = eval_emission(object, element, uv, normal, outgoing);
       auto brdf     = eval_brdf(object, element, uv, normal, outgoing);
 
@@ -1609,10 +1613,13 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
           incoming = sample_lights(
               scene, position, rand1f(rng), rand1f(rng), rand2f(rng));
         }
-        weight *= eval_brdfcos(brdf, normal, outgoing, incoming) /
-                  (0.5f * sample_brdfcos_pdf(brdf, normal, outgoing, incoming) +
-                      0.5f * sample_lights_pdf(scene, position, incoming));
-      
+        // weight *= eval_brdfcos(brdf, normal, outgoing, incoming) /
+                  // (0.5f * sample_brdfcos_pdf(brdf, normal, outgoing, incoming) +
+        //               0.5f * sample_lights_pdf(scene, position, incoming));
+           weight*= eval_f(outgoing,incoming).diffuse/
+                    (0.5f*Sample_f(outgoing,&incoming,rand2f(rng),0))
+                    + 0.5f * sample_lights_pdf(scene, position, incoming);
+                    
       // setup next iteration
       ray = {position, incoming}; 
   }
