@@ -1196,6 +1196,130 @@ static float norm_vec(vec3f v){
   return sqrt(rec_pow(v.x,2)+rec_pow(v.y,2)+rec_pow(v.z,2));
 }
 
+auto eta=1.55f;
+auto sigma_a=0;
+auto pMax=3;
+auto alpha=2;
+
+
+static void alpha_values(float cos2kAlpha[3],float sin2kAlpha[3]){
+  sin2kAlpha[0] = std::sin(alpha);
+  cos2kAlpha[0] = SafeSqrt(1 - rec_pow(sin2kAlpha[0],2));
+	for (int i = 1; i < 3; ++i) {
+		sin2kAlpha[i] = 2 * cos2kAlpha[i - 1] * sin2kAlpha[i - 1];
+		cos2kAlpha[i] = rec_pow(cos2kAlpha[i - 1],2) - rec_pow(sin2kAlpha[i - 1],2);
+  }
+}
+
+float FrDielectric(float cosThetaI, float etaI, float etaT) {
+    cosThetaI = clamping(cosThetaI, -1, 1);
+    // Potentially swap indices of refraction
+    bool entering = cosThetaI > 0.f;
+    if (!entering) {
+        std::swap(etaI, etaT);
+        cosThetaI = std::abs(cosThetaI);
+    }
+
+    // Compute _cosThetaT_ using Snell's law
+    float sinThetaI = std::sqrt(std::max((float)0, 1 - cosThetaI * cosThetaI));
+    float sinThetaT = etaI / etaT * sinThetaI;
+
+    // Handle total internal reflection
+    if (sinThetaT >= 1) return 1;
+    float cosThetaT = std::sqrt(std::max((float)0, 1 - sinThetaT * sinThetaT));
+    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+                  ((etaT * cosThetaI) + (etaI * cosThetaT));
+    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+                  ((etaI * cosThetaI) + (etaT * cosThetaT));
+    return (Rparl * Rparl + Rperp * Rperp) / 2;
+}
+
+static float* Ap(float cosThetaO, float eta, float h, float T ) {
+  
+  float ap[pMax+1];
+	
+	// <Compute p = 0 attenuation at initial cylinder intersection>
+		float cosGammaO = SafeSqrt(1 - h * h);
+		float cosTheta = cosThetaO * cosGammaO;
+		float f = FrDielectric(cosTheta,1.f,eta);
+		ap[0] = f;
+
+	// <Compute p = 1 attenuation term>
+		ap[1] = rec_pow((1 - f),2) * T;
+
+	// <Compute attenuation terms up to p = pMax>
+		for (int p = 2; p < pMax; ++p)
+			ap[p] = ap[p - 1] * T * f;
+	// <Compute attenuation term accounting for remaining orders of scattering>
+		ap[pMax] = ap[pMax - 1] * f * T / (float(1.f) - T * f);
+	return ap;
+}
+
+//BRDF 
+static brdf eval_f(const vec3f &wo, const vec3f &wi,vec3f normal){
+  auto cosGamma = dot(normal,wo)/(norm_vec(normal)*norm_vec(wo));
+  auto h = sqrt(1-rec_pow(cosGamma,2));
+// <Compute hair coordinate system terms related to wo>
+	float sinThetaO = wo.x;
+	float cosThetaO = SafeSqrt(1 - rec_pow(sinThetaO , 2));
+	float phiO = std::atan2(wo.z, wo.y);
+
+// <Compute hair coordinate system terms related to wi>
+	float sinThetaI = wi.x;
+	float cosThetaI = SafeSqrt(1 - rec_pow(sinThetaI , 2));
+	float phiI = std::atan2(wi.z, wi.y);
+
+// <Compute cos θ t for refracted ray>
+	float sinThetaT = sinThetaO / eta;
+	float cosThetaT = SafeSqrt(1 - rec_pow((sinThetaT),2));
+
+// <Compute γ t for refracted ray>
+	float etap = std::sqrt(eta * eta - rec_pow((sinThetaO),2) / cosThetaO);
+	float sinGammaT = h / etap;
+	float cosGammaT = SafeSqrt(1 - rec_pow((sinGammaT),2));
+	float gammaT = SafeASin(sinGammaT);
+
+// <Compute the transmittance T of a single path through the cylinder>
+	float T = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
+
+// <Evaluate hair BSDF>
+
+	float phi = phiI - phiO;
+	float ap[pMax+1] = Ap(cosThetaO, eta, h, T);
+  auto fsum   = ptr::brdf{};
+  float cos2kAlpha[3],sin2kAlpha[3];
+  alpha_values(cos2kAlpha,sin2kAlpha);
+	for (int p = 0; p < pMax; ++p) {
+		// <Compute sin θ i and cos θ i terms accounting for scales>
+			float sinThetaIp, cosThetaIp;
+			if (p == 0) {
+			sinThetaIp = sinThetaI * cos2kAlpha[1] + cosThetaI *sin2kAlpha[1];
+			cosThetaIp = cosThetaI * cos2kAlpha[1] - sinThetaI * sin2kAlpha[1];
+			}
+			// <Handle remainder of p values for hair scale tilt>
+				if (p == 1) {
+				//Cambia segno se le cose si fanno avverse - mimmo
+				sinThetaIp = sinThetaI * cos2kAlpha[0] + cosThetaI *sin2kAlpha[0];
+				cosThetaIp = cosThetaI * cos2kAlpha[0] - sinThetaI * sin2kAlpha[0];
+				}
+				if (p == 2) {
+				sinThetaIp = sinThetaI * cos2kAlpha[2] + cosThetaI *sin2kAlpha[2];
+				cosThetaIp = cosThetaI * cos2kAlpha[2] - sinThetaI * sin2kAlpha[2];
+				}
+				// <Handle out-of-range cos θ i from scale adjustment>
+					cosThetaIp = std::abs(cosThetaIp);
+
+			fsum += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p] *
+			Np(phi, p, s, gammaO, gammaT);
+	}
+	// <Compute contribution of remaining terms after pMax>
+		fsum += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
+			ap[pMax] / (2.f * Pi);
+	
+	if (AbsCosTheta(wi) > 0) fsum /= AbsCosTheta(wi);
+	return fsum;
+}
+
 
 // Path tracing.
 static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
@@ -1238,18 +1362,8 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       radiance += weight * eval_emission(emission, normal, outgoing);
 
       //Hair Parameters 
-<<<<<<< HEAD
       auto eta = 1.55f;
-      auto cosGamma = dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
-      auto h = sqrt(1-rec_pow(cosGamma,2));
-=======
-      auto eta =1.55f;
-      auto cosGamma = dot(normal,outgoing)/(norm_vec(normal)*norm_vec(outgoing));
-      auto h = sqrt(1-rec_pow(cosGamma,2));
-
-
-
->>>>>>> 5c4d09f034de0afa4c1ac06806f7ae29fa4a926e
+      
       // next direction
       auto incoming = zero3f;
         if (rand1f(rng) < 0.5f) {
