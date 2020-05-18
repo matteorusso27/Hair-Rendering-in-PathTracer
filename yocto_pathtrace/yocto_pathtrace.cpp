@@ -1260,28 +1260,24 @@ float FrDielectric(float cosThetaI, float etaI, float etaT) {
 }
 
 // ------------AP --------------//
-static brdf* Ap(float cosThetaO, float eta, float h, brdf T ) {
+static vec3f* Ap(float cosThetaO, float eta, float h, vec3f T ) {
   
-  brdf*ap = new brdf[pMax+1];
+  vec3f*ap = new vec3f[pMax+1];
 	
 	// <Compute p = 0 attenuation at initial cylinder intersection>
 		float cosGammaO = SafeSqrt(1 - h * h);
 		float cosTheta = cosThetaO * cosGammaO;
 		float f = FrDielectric(cosTheta,1.f,eta);
-		ap[0].diffuse.x=f;
-    ap[0].diffuse.y=f;
-    ap[0].diffuse.z=f;
+		ap[0]=vec3f{f};
 
 	// <Compute p = 1 attenuation term>
-		ap[1].diffuse = rec_pow((1 - f),2) * T.diffuse;
-    ap[1].diffuse = rec_pow((1 - f),2) * T.diffuse;
-    ap[1].diffuse = rec_pow((1 - f),2) * T.diffuse;
+		ap[1] = rec_pow((1 - f),2) * T;
 
 	// <Compute attenuation terms up to p = pMax>
 		for (int p = 2; p < pMax; ++p)
-			ap[p].diffuse = ap[p - 1].diffuse * T.diffuse * f;
+			ap[p] = ap[p - 1] * T * f;
 	// <Compute attenuation term accounting for remaining orders of scattering>
-		ap[pMax].diffuse = ap[pMax - 1].diffuse * f * T.diffuse / (float(1.f) - T.diffuse * f);
+		ap[pMax] = ap[pMax - 1]* f * T / (float(1.f) - T * f);
 	return ap;
 }
 
@@ -1348,11 +1344,11 @@ inline float Np(float phi, int p, float s, float gammaO,
 }
 
 float h=0.f;
-brdf T;
 
 vec3f normal;
+vec3f T;
 //BRDF 
-static brdf eval_f(const vec3f &wo, const vec3f &wi){
+static vec3f eval_f(const vec3f &wo, const vec3f &wi){
   
   auto cosGamma = dot(normal,wo)/(norm_vec(normal)*norm_vec(wo));
   h = sqrt(1-rec_pow(cosGamma,2));
@@ -1382,16 +1378,13 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi){
 
 // <Compute the transmittance T of a single path through the cylinder>
   
-  T.diffuse.x = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
-  T.diffuse.y = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
-  T.diffuse.z = std::exp(-sigma_a * (2 * cosGammaT / cosThetaT));
-
+   T = vec3f{std::exp(-sigma_a * (2 * cosGammaT / cosThetaT))};
 
 // <Evaluate hair BSDF>
 
 	float phi = phiI - phiO;
-  brdf *ap= Ap(cosThetaO, eta, h, T);
-  auto fsum   = ptr::brdf{};
+  vec3f *ap= Ap(cosThetaO, eta, h, T);
+  auto fsum   =vec3f{};
   float cos2kAlpha[3],sin2kAlpha[3];
   alpha_values(cos2kAlpha,sin2kAlpha);
 	for (int p = 0; p < pMax; ++p) {
@@ -1416,27 +1409,33 @@ static brdf eval_f(const vec3f &wo, const vec3f &wi){
 				// <Handle out-of-range cos θ i from scale adjustment>
 					cosThetaIp = std::abs(cosThetaIp);
 
-			fsum.diffuse += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p].diffuse.x *
+			fsum += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p] *
 			Np(phi, p, s, gamma0, gammaT);
 	}
 	// <Compute contribution of remaining terms after pMax>
-		fsum.diffuse += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
-			ap[pMax].diffuse / (2.f * pi);
+		fsum += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
+			ap[pMax] / (2.f * pi);
 	
-	if (std::abs(wi.z) > 0) fsum.diffuse /= std::abs(wi.z);
+	if (std::abs(wi.z) > 0) fsum /= std::abs(wi.z);
 	return fsum;
 }
 
 // ----------PDF-------------
 // -A p-
-inline brdf* ComputeApPdf(float cosThetaO){
-	brdf *ap = Ap(cosThetaO, eta, h, T);
+inline float* ComputeApPdf(float cosThetaO){
+	vec3f *ap = Ap(cosThetaO, eta, h, T);
 	// <Compute A p PDF from individual A p terms>
-    brdf * apPdf=new brdf[pMax+1];
-		float sumY = std::accumulate(ap[0].diffuse, ap[-1].diffuse, float(0),
-		[](float s, float &ap) { return s + ap; });
-		for (int i = 0; i <= pMax; ++i)
-		apPdf[i].diffuse = ap[i].diffuse/ sumY;
+    float * apPdf=new float[pMax+1];
+    int i;
+    float sumY=0.f;
+    for (i=0; i<5; i++){
+        if(apPdf[i]==0)
+          break;
+        sumY+=apPdf[i];
+    }
+		// float sumY = std::accumulate(ap[0], ap[length-1], float(0),[](float s, float &ap) { return s + ap; });
+		for (i = 0; i <= pMax; ++i)
+		  apPdf[0] = ap[i].x/ sumY;
 	return apPdf;
 }
 
@@ -1468,7 +1467,7 @@ float b) {
 }
 
 
- inline float Sample_f(const vec3f &wo, vec3f *wi,const vec2f &u2, float*pdf){ //BxDFType *sampledType) {
+ inline float Sample_f(const vec3f &wo, vec3f *wi,const vec2f &u2, float pdf){ //BxDFType *sampledType) {
 	// <Compute hair coordinate system terms related to wo>
 		float sinThetaO = wo.x;
 		float cosThetaO = SafeSqrt(1 - rec_pow(sinThetaO , 2));
@@ -1476,11 +1475,11 @@ float b) {
 	// <Derive four random samples from u2 >
 		vec2f u[2] = { DemuxFloat(u2[0]), DemuxFloat(u2[1]) };
 	// <Determine which term p to sample for hair scattering>
-    brdf*  apPdf = ComputeApPdf(cosThetaO);
+    float*  apPdf = ComputeApPdf(cosThetaO);
     int p;
 		for (p = 0; p < pMax; ++p) {
-			if (u[0][0] < apPdf[p].diffuse.x) break;
-			u[0][0] -= apPdf[p].diffuse.x;
+			if (u[0][0] < apPdf[p]) break;
+			u[0][0] -= apPdf[p];
 		}
 
     // Rotate $\sin \thetao$ and $\cos \thetao$ to account for hair scale tilt
@@ -1531,7 +1530,7 @@ float b) {
 		float phiI = phiO + dphi;
 		*wi = vec3f(sinThetaI, cosThetaI * std::cos(phiI),cosThetaI * std::sin(phiI));
 	// <Compute PDF for sampled hair scattering direction wi >
-		*pdf = 0;
+		pdf = 0;
 		
     for (int p = 0; p < pMax; ++p) {
 			// <Compute sin θ i and cos θ i terms accounting for scales>
@@ -1552,13 +1551,13 @@ float b) {
 					}
 					// <Handle out-of-range cos θ i from scale adjustment>
 						cosThetaIp = std::abs(cosThetaIp);
-			*pdf += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) *
-			apPdf[p].diffuse.x * Np(dphi, p, s, gamma0, gammaT);
+			pdf += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) *
+			apPdf[p] * Np(dphi, p, s, gamma0, gammaT);
 		}
-		*pdf += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
-		apPdf[pMax].diffuse.x * (1 / (2 * pi));
+		pdf += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
+		apPdf[pMax] * (1 / (2 * pi));
 
-  return *pdf;
+  return pdf;
 }
 
 // Path tracing.
@@ -1588,14 +1587,16 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       auto position = eval_position(object, element, uv);
        normal   = eval_shading_normal(object, element, uv, outgoing);
       auto emission = eval_emission(object, element, uv, normal, outgoing);
-      auto brdf     = eval_brdf(object, element, uv, normal, outgoing);
+      // auto brdf     = eval_brdf(object, element, uv, normal, outgoing);
 
+      // auto brdf=eval_f()
+      
       // handle opacity
-      if (brdf.opacity < 1 && rand1f(rng) >= brdf.opacity) {
-        ray = {position + ray.d * 1e-2f, ray.d};
-        bounce -= 1;
-        continue;
-      }
+      // if (brdf.opacity < 1 && rand1f(rng) >= brdf.opacity) {
+      //   ray = {position + ray.d * 1e-2f, ray.d};
+      //   bounce -= 1;
+      //   continue;
+      // }
       hit = true;
 
       // accumulate emission
@@ -1605,18 +1606,15 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       auto eta = 1.55f;
       
       // next direction
-      auto incoming = zero3f;
-        if (rand1f(rng) < 0.5f) {
-          incoming = sample_brdfcos(
-              brdf, normal, outgoing, rand1f(rng), rand2f(rng));
-        } else {
-          incoming = sample_lights(
-              scene, position, rand1f(rng), rand1f(rng), rand2f(rng));
-        }
+      auto cosGammaO=dot(outgoing,normal)/(norm_vec(outgoing)*norm_vec(normal));
+      auto sinGammaO=SafeSqrt(1-cosGammaO*cosGammaO);
+      auto incoming = vec3f{cosGammaO,sinGammaO,outgoing.z};
+      
+      
         // weight *= eval_brdfcos(brdf, normal, outgoing, incoming) /
-                  // (0.5f * sample_brdfcos_pdf(brdf, normal, outgoing, incoming) +
+        //           (0.5f * sample_brdfcos_pdf(brdf, normal, outgoing, incoming) +
         //               0.5f * sample_lights_pdf(scene, position, incoming));
-           weight*= eval_f(outgoing,incoming).diffuse/
+           weight*= eval_f(outgoing,incoming)/
                     (0.5f*Sample_f(outgoing,&incoming,rand2f(rng),0))
                     + 0.5f * sample_lights_pdf(scene, position, incoming);
                     
