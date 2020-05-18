@@ -196,7 +196,8 @@ static vec3f eval_position(
     return transform_point(
         object->frame, interpolate_triangle(shape->positions[t.x],
                            shape->positions[t.y], shape->positions[t.z], uv));
-  } else if (!shape->lines.empty()) {
+  }  else
+  if (!shape->lines.empty()) {
     auto l = shape->lines[element];
     return transform_point(object->frame,
         interpolate_line(shape->positions[l.x], shape->positions[l.y], uv.x));
@@ -1198,12 +1199,16 @@ static float norm_vec(vec3f v){
   return sqrt(rec_pow(v.x,2)+rec_pow(v.y,2)+rec_pow(v.z,2));
 }
 
-auto eta=1.55f;
-auto sigma_a=0;
-auto pMax=3;
-auto alpha=2;
-float beta_n=0.3f;
-float beta_m=0.3f;
+  float eta=1.55f;
+  float sigma_a=1.f;
+  int pMax=3;
+  float alpha=2.f;
+  float beta_n=0.3f;
+  float beta_m=0.3f;
+  float *v=long_var(beta_m);
+  float h=0.f;
+  vec3f normal;
+  vec3f T;
 
 
 // <Compute longitudinal variance from β_m >
@@ -1217,8 +1222,6 @@ inline float* long_var(float b_m){
 	  v[p] = v[2];
   return v;
 }
-
-float *v=long_var(beta_m);
 
 // <Compute azimuthal logistic scale factor from β_n>
 	static const float SqrtPiOver8 = 0.626657069f;
@@ -1298,7 +1301,7 @@ inline float I0(float x) {
 
 inline float LogI0(float x) {
     if (x > 12)
-        return x + 0.5 * (-std::log(2 * math::pi) + std::log(1 / x) + 1 / (8 * x));
+        return x + 0.5 * (-std::log(2 * pi) + std::log(1 / x) + 1 / (8 * x));
     else
         return std::log(I0(x));
 }
@@ -1343,10 +1346,6 @@ inline float Np(float phi, int p, float s, float gammaO,
 	return TrimmedLogistic(dphi, s, -pi, pi);
 }
 
-float h=0.f;
-
-vec3f normal;
-vec3f T;
 //BRDF 
 static vec3f eval_f(const vec3f &wo, const vec3f &wi){
   
@@ -1601,14 +1600,34 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
 
       // accumulate emission
       radiance += weight * eval_emission(emission, normal, outgoing);
+       auto incoming = zero3f;
+      //Render the floor
+      if(object->shape->lines.empty()){
+          auto brdf     = eval_brdf(object, element, uv, normal, outgoing);
+          hit = true;
 
-      //Hair Parameters 
-      auto eta = 1.55f;
-      
-      // next direction
+        // next direction
+       
+        // if (!is_delta(brdf)) {
+          if (rand1f(rng) < 0.5f) {
+            incoming = sample_brdfcos(brdf, normal, outgoing, rand1f(rng), rand2f(rng));
+          } else {
+            incoming = sample_lights(scene, position, rand1f(rng), rand1f(rng), rand2f(rng));
+          }
+          weight *= eval_brdfcos(brdf, normal, outgoing, incoming) /
+                    (0.5f * sample_brdfcos_pdf(brdf, normal, outgoing, incoming) +
+                        0.5f * sample_lights_pdf(scene, position, incoming));
+        // } else {
+        //   incoming = sample_delta(brdf, normal, outgoing, rand1f(rng));
+        //   weight *= eval_delta(brdf, normal, outgoing, incoming) /
+        //             sample_delta_pdf(brdf, normal, outgoing, incoming);
+        // }
+      }   //Render Hair
+      else{
+          // next direction
       auto cosGammaO=dot(outgoing,normal)/(norm_vec(outgoing)*norm_vec(normal));
       auto sinGammaO=SafeSqrt(1-cosGammaO*cosGammaO);
-      auto incoming = vec3f{cosGammaO,sinGammaO,outgoing.z};
+      incoming = vec3f{cosGammaO,-sinGammaO,outgoing.z};
       
       
         // weight *= eval_brdfcos(brdf, normal, outgoing, incoming) /
@@ -1617,7 +1636,7 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
            weight*= eval_f(outgoing,incoming)/
                     (0.5f*Sample_f(outgoing,&incoming,rand2f(rng),0))
                     + 0.5f * sample_lights_pdf(scene, position, incoming);
-                    
+      }          
       // setup next iteration
       ray = {position, incoming}; 
   }
