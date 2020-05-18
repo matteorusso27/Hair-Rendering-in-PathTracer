@@ -1196,26 +1196,25 @@ static float SafeSqrt(float x) {
 }
 
 static float norm_vec(vec3f v){
-  return sqrt(rec_pow(v.x,2)+rec_pow(v.y,2)+rec_pow(v.z,2));
+  return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 }
 
-  float eta=1.55f;
+float eta=1.55f;
   float sigma_a=1.f;
   int pMax=3;
   float alpha=2.f;
   float beta_n=0.3f;
   float beta_m=0.3f;
-  float *v=long_var(beta_m);
   float h=0.f;
   vec3f normal;
   vec3f T;
 
-
 // <Compute longitudinal variance from β_m >
 inline float* long_var(float b_m){
   float *v= new float[pMax+1];
-  v[0] = rec_pow((0.726f * beta_m + 0.812f * rec_pow((beta_m),2) +
-	3.7f * rec_pow((beta_m),20)),2);
+  float inter = 0.726f * beta_m + 0.812f * beta_m*beta_m +
+	3.7f * rec_pow(beta_m,20);
+  v[0] = inter*inter;
 	v[1] = .25 * v[0];
 	v[2] = 4 * v[0];
 	for (int p = 3; p <= pMax; ++p)
@@ -1223,19 +1222,23 @@ inline float* long_var(float b_m){
   return v;
 }
 
+
+  float *v=long_var(beta_m);
+
+
 // <Compute azimuthal logistic scale factor from β_n>
 	static const float SqrtPiOver8 = 0.626657069f;
 
-	float s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * rec_pow((beta_n),2) +
-		5.372f *rec_pow((beta_n),22));
+	float s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * beta_n*beta_n +
+		5.372f *rec_pow(beta_n,22));
 
 
 static void alpha_values(float cos2kAlpha[3],float sin2kAlpha[3]){
   sin2kAlpha[0] = std::sin(alpha);
-  cos2kAlpha[0] = SafeSqrt(1 - rec_pow(sin2kAlpha[0],2));
+  cos2kAlpha[0] = SafeSqrt(1 - sin2kAlpha[0]*sin2kAlpha[0]);
 	for (int i = 1; i < 3; ++i) {
 		sin2kAlpha[i] = 2 * cos2kAlpha[i - 1] * sin2kAlpha[i - 1];
-		cos2kAlpha[i] = rec_pow(cos2kAlpha[i - 1],2) - rec_pow(sin2kAlpha[i - 1],2);
+		cos2kAlpha[i] = cos2kAlpha[i - 1]*cos2kAlpha[i - 1] - sin2kAlpha[i - 1]*sin2kAlpha[i - 1];
   }
 }
 
@@ -1274,7 +1277,7 @@ static vec3f* Ap(float cosThetaO, float eta, float h, vec3f T ) {
 		ap[0]=vec3f{f};
 
 	// <Compute p = 1 attenuation term>
-		ap[1] = rec_pow((1 - f),2) * T;
+		ap[1] = (1 - f)*(1 - f) * T;
 
 	// <Compute attenuation terms up to p = pMax>
 		for (int p = 2; p < pMax; ++p)
@@ -1292,7 +1295,7 @@ inline float I0(float x) {
     // I0(x) \approx Sum_i x^(2i) / (4^i (i!)^2)
     for (int i = 0; i < 10; ++i) {
         if (i > 1) ifact *= i;
-        val += x2i / (i4 * rec_pow((ifact),2));
+        val += x2i / (i4 * ifact*ifact);
         x2i *= x * x;
         i4 *= 4;
     }
@@ -1350,29 +1353,29 @@ inline float Np(float phi, int p, float s, float gammaO,
 static vec3f eval_f(const vec3f &wo, const vec3f &wi){
   
   auto cosGamma = dot(normal,wo)/(norm_vec(normal)*norm_vec(wo));
-  h = sqrt(1-rec_pow(cosGamma,2));
+  h = sqrt(1-cosGamma*cosGamma);
   float cosGamma0=SafeSqrt(1-h*h);
   float sinGamma0=SafeSqrt(1-cosGamma0*cosGamma0);
 
   float gamma0=SafeASin(sinGamma0);
 // <Compute hair coordinate system terms related to wo>
 	float sinThetaO = wo.x;
-	float cosThetaO = SafeSqrt(1 - rec_pow(sinThetaO , 2));
+	float cosThetaO = SafeSqrt(1 - sinThetaO*sinThetaO);
 	float phiO = std::atan2(wo.z, wo.y);
 
 // <Compute hair coordinate system terms related to wi>
 	float sinThetaI = wi.x;
-	float cosThetaI = SafeSqrt(1 - rec_pow(sinThetaI , 2));
+	float cosThetaI = SafeSqrt(1 - sinThetaI*sinThetaI);
 	float phiI = std::atan2(wi.z, wi.y);
 
 // <Compute cos θ t for refracted ray>
 	float sinThetaT = sinThetaO / eta;
-	float cosThetaT = SafeSqrt(1 - rec_pow((sinThetaT),2));
+	float cosThetaT = SafeSqrt(1 - sinThetaT*sinThetaT);
 
 // <Compute γ t for refracted ray>
-	float etap = std::sqrt(eta * eta - rec_pow((sinThetaO),2) / cosThetaO);
+	float etap = std::sqrt(eta * eta - sinThetaO*sinThetaO) / cosThetaO;
 	float sinGammaT = h / etap;
-	float cosGammaT = SafeSqrt(1 - rec_pow((sinGammaT),2));
+	float cosGammaT = SafeSqrt(1 - sinGammaT*sinGammaT);
 	float gammaT = SafeASin(sinGammaT);
 
 // <Compute the transmittance T of a single path through the cylinder>
@@ -1469,7 +1472,7 @@ float b) {
  inline float Sample_f(const vec3f &wo, vec3f *wi,const vec2f &u2, float pdf){ //BxDFType *sampledType) {
 	// <Compute hair coordinate system terms related to wo>
 		float sinThetaO = wo.x;
-		float cosThetaO = SafeSqrt(1 - rec_pow(sinThetaO , 2));
+		float cosThetaO = SafeSqrt(1 - sinThetaO*sinThetaO);
 		float phiO = std::atan2(wo.z, wo.y);
 	// <Derive four random samples from u2 >
 		vec2f u[2] = { DemuxFloat(u2[0]), DemuxFloat(u2[1]) };
@@ -1502,16 +1505,16 @@ float b) {
     u[1][0] = std::max(u[1][0], float(1e-5));
     float cosTheta =
         1 + v[p] * std::log(u[1][0] + (1 - u[1][0]) * std::exp(-2 / v[p]));
-    float sinTheta = SafeSqrt(1 - rec_pow((cosTheta),2));
+    float sinTheta = SafeSqrt(1 - cosTheta*cosTheta);
     float cosPhi = std::cos(2 * pi * u[1][1]);
     float sinThetaI = -cosTheta * sinThetaOp + sinTheta * cosPhi * cosThetaOp;
-    float cosThetaI = SafeSqrt(1 - rec_pow((sinThetaI),2));
+    float cosThetaI = SafeSqrt(1 - sinThetaI*sinThetaI);
   //CODICE BBBRUTTO
 	// <Sample N p to compute ∆φ>
 		// <Compute γ t for refracted ray>
-			float etap = std::sqrt(eta * eta - rec_pow((sinThetaO),2)) / cosThetaO;
+			float etap = std::sqrt(eta * eta - sinThetaO*sinThetaO) / cosThetaO;
 			float sinGammaT = h / etap;
-			float cosGammaT = SafeSqrt(1 - rec_pow((sinGammaT),2));
+			float cosGammaT = SafeSqrt(1 - sinGammaT*sinGammaT);
 			float gammaT = SafeASin(sinGammaT);
 		float dphi;
     float cosGamma0=SafeSqrt(1-h*h);
