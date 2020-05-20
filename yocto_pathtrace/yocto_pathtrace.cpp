@@ -1453,9 +1453,10 @@ float* ComputeApPdf(float cosThetaO){
      float sumY=0.f;
     
     vec3f y = {0.212671f, 0.715160f, 0.072169f};
-    for (i=0; i<5; i++){
-      sumY += ap[i].x * y.x + ap[i].y * y.y + ap[i].z * y.x;      
-    }
+    // for (i=0; i<5; i++){
+      // sumY += ap[i].x * y.x + ap[i].y * y.y + ap[i].z * y.x; 
+      sumY += y.x * ap[0].x + y.y * ap[1].y + y.z * ap[2].z;     
+    // }
 		//float sumY = accumulate(ap[0], ap[length-1], float(0),[](float s, float &ap) { return s + ap; });
 		for (i = 0; i <= pMax; ++i)
 		  apPdf[i] = (ap[i].x * y.x + ap[i].y * y.y + ap[i].z * y.x) / sumY;
@@ -1729,13 +1730,16 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
                 //0.5f * sample_lights_pdf(scene, position, incoming));
                    // +0.5f * Pdf(outgoing, incoming));
 
-            
       }
 
      // setup next iteration
       ray = {position, incoming}; 
 
-      if (bounce > 3) {
+      // check weight
+    if (weight == zero3f || !isfinite(weight)) break;
+
+    // russian roulette
+    if (bounce > 3) {
       auto rr_prob = min((float)0.99, max(weight));
       if (rand1f(rng) >= rr_prob) break;
       weight *= 1 / rr_prob;
