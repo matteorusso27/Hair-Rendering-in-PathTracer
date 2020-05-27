@@ -214,13 +214,13 @@ using ushort = unsigned short;
 inline const double pi  = 3.14159265358979323846;
 inline const float  pif = (float)pi;
 inline const int pMax = 3;
-inline const float SqrtPiOver8 = 0.626657069f;
-inline const float eta=1.55f;
+inline const float SqrtPiOver8 = 0.626657069;
+inline const float eta=1.55;
 const int alpha=2;
 
 //Betas
 inline const float beta_n= 0.3;
-const float beta_m= 0.125;
+inline const float beta_m= 0.3;
 
 inline const auto int_max = std::numeric_limits<int>::max();
 inline const auto int_min = std::numeric_limits<int>::lowest();

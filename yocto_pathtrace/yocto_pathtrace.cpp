@@ -1345,8 +1345,9 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
 
     // Compute the transmittance _T_ of a single path through the cylinder
     auto T= zero3f;
-    for(int j= 0 ; j < 2; j++)
-      T[j] = std::exp(-sigma_a[j] * (2 * cosGammaT / cosThetaT));
+    T[0] = std::exp(-sigma_a[0] * (2 * cosGammaT / cosThetaT));
+    T[1] = std::exp(-sigma_a[1] * (2 * cosGammaT / cosThetaT));
+    // T[2] = std::exp(-sigma_a[2] * (2 * cosGammaT / cosThetaT));
 
     // Evaluate hair BSDF
     float phi = phiI - phiO;
@@ -1390,7 +1391,6 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
             cosThetaIp = cosThetaI * cos2kAlpha[2] + sinThetaI * sin2kAlpha[2];
         } 
         else {
-            print(3);
             sinThetaIp = sinThetaI;
             cosThetaIp = cosThetaI;
         }
@@ -1420,8 +1420,10 @@ std::array<float, pMax + 1> ComputeApPdf(float cosThetaO,rng_state& rng)  {
     float gammaT = SafeASin(sinGammaT); 
 
    auto T = zero3f; 
-     for(int j= 0 ; j < 2; j++)
-      T[j] = std::exp(-sigma_a[j] * (2 * cosGammaT / cosThetaT));
+     
+    T[0] = std::exp(-sigma_a[0] * (2 * cosGammaT / cosThetaT));
+    T[1] = std::exp(-sigma_a[1] * (2 * cosGammaT / cosThetaT));
+    T[2] = std::exp(-sigma_a[2] * (2 * cosGammaT / cosThetaT));
 
     std::array<vec3f, pMax + 1> ap = Ap(cosThetaO, eta, rng, T);
     
@@ -1431,7 +1433,7 @@ std::array<float, pMax + 1> ComputeApPdf(float cosThetaO,rng_state& rng)  {
     const float YWeight[3] = {0.212671f, 0.715160f, 0.072169f};
     //accumulate values
     for(int j= 0 ; j < pMax+1; j++){
-      sumY+= YWeight[0]*ap[0][0] + YWeight[1]*ap[1][0] +YWeight[2]*ap[2][0];
+      sumY+= YWeight[0]*ap[j][0] + YWeight[1]*ap[j][0] +YWeight[2]*ap[j][0];
     }
     float acc = 0;
     for(int j= 0 ; j < pMax+1; j++){
