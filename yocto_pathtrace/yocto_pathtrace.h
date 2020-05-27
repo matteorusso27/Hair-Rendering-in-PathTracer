@@ -425,4 +425,20 @@ intersection3f intersect_instance_bvh(const ptr::object* object,
 
 }  // namespace yocto::pathtrace
 
+
+// ----------------------------
+
+//               Spectrum Part
+
+// ----------------------------
+
+// namespace yocto::pathtrace {
+
+// struct spectrum{
+//   const static int samples=8;
+//   static float c[samples];
+//   static const int sampledLambdaStart = 400;
+//   static const int sampledLambdaEnd = 700;
+// };
+
 #endif

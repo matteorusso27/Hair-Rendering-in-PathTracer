@@ -210,9 +210,17 @@ namespace yocto::math {
 using byte   = unsigned char;
 using uint   = unsigned int;
 using ushort = unsigned short;
-
+//Constant parameters
 inline const double pi  = 3.14159265358979323846;
 inline const float  pif = (float)pi;
+inline const int pMax = 3;
+inline const float SqrtPiOver8 = 0.626657069f;
+inline const float eta=1.55f;
+const int alpha=2;
+
+//Betas
+inline const float beta_n= 0.3;
+const float beta_m= 0.125;
 
 inline const auto int_max = std::numeric_limits<int>::max();
 inline const auto int_min = std::numeric_limits<int>::lowest();
@@ -311,6 +319,11 @@ struct vec4f {
 inline const auto zero2f = vec2f{0, 0};
 inline const auto zero3f = vec3f{0, 0, 0};
 inline const auto zero4f = vec4f{0, 0, 0, 0};
+
+//Sigma values
+inline const auto sigma_a = vec3f{0.06, 0.10, 0.20}; //biondo
+// inline const auto sigma_a = vec3f{0.84, 1.39, 2.74};//marrone
+// inline const auto sigma_a = vec3f{3.35, 5.58, 10.96}; //nero
 
 // Element access
 inline vec3f&       xyz(vec4f& a);
