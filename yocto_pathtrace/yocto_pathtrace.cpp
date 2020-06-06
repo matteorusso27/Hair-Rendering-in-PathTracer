@@ -78,8 +78,8 @@ using math::zero4f;
 using math::zero4i;
 //Const parameters
 // using math::sigma_a;
-using math::beta_n;
-using math::beta_m;
+// using math::beta_n;
+// using math::beta_m;
 using math::pMax;
 using math::SqrtPiOver8;
 using math::eta;
@@ -1168,11 +1168,30 @@ static float sample_scattering_pdf(
   if (vsdf.density == zero3f) return 0;
   return sample_phasefunction_pdf(vsdf.anisotropy, outgoing, incoming);
 }
-//Functions for the Project
 
-static void print(float val){
-  std::cout<<val<<std::endl;
-}
+// HAIR SCATTERING MODEL IMPLEMENTATION
+
+// --Parameters
+//The betas represents the roughness in the two different
+//planes we are considering 
+inline const float beta_n= 0.3; //Azimuthal Roughness
+inline const float beta_m= 0.125; //Longitudinal Rougness
+
+//Absorption coefficient of the hair interior
+
+//Enable this for Black Hair
+//inline const auto sigma_a = vec3f{3.35, 5.58, 10.96}; 
+
+//Enable this for Blonde Hair
+//inline const auto sigma_a = vec3f{0.06,0.14,0.3}; //ours
+//inline const auto sigma_a = vec3f{0.06,0.10,0.20}; //paper
+
+//Enable this for Brown Hair
+inline const auto sigma_a = vec3f{0.84, 1.39, 2.74};
+
+//Offset along the curve width where the ray intersected the
+  //oriented ribbon
+inline float h;
 
 inline float Sqr(float v) { return v * v; }
 template <int n>
@@ -1233,10 +1252,9 @@ float FrDielectric(float cosThetaI, float etaI, float etaT) {
 }
 
 static std::array<vec3f, pMax + 1> Ap(float cosThetaO, float eta,
-        rng_state& rng, const vec3f &T) {
+         const vec3f &T) {
     
     std::array<vec3f, pMax + 1> ap;
-    float h = Clamp(-1+2*rand1f(rng),-1,1);
     float cosGammaO = SafeSqrt(1 - h * h);
     float cosTheta = cosThetaO * cosGammaO;
     float f = FrDielectric(cosTheta, 1.f, eta);
@@ -1287,7 +1305,6 @@ inline float LogisticCDF(float x, float s) {
 }
 
 inline float TrimmedLogistic(float x, float s, float a, float b) {
-    // CHECK_LT(a, b);
     return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
 }
 
@@ -1300,10 +1317,8 @@ inline float Np(float phi, int p, float s, float gammaO, float gammaT) {
 }
 
 static float SampleTrimmedLogistic(float u, float s, float a, float b) {
-    // CHECK_LT(a, b);
     float k = LogisticCDF(b, s) - LogisticCDF(a, s);
     float x = -s * std::log(1 / (u * k + LogisticCDF(a, s)) - 1);
-    // CHECK(!std::isnan(x));
     return Clamp(x, a, b);
 }
 
@@ -1312,17 +1327,15 @@ inline float AbsCosTheta(const vec3f &w) { return std::abs(w.z); }
 static float Mp(float cosThetaI, float cosThetaO, float sinThetaI,
       float sinThetaO, float v) {
   
-  float a = cosThetaI * cosThetaO / v;
-  float b = sinThetaI * sinThetaO / v;
-  float mp = (v <= .1) ?
-  (std::exp(LogI0(a) - b - 1/v + 0.6931f + std::log(1 / (2*v)))) :
-  (std::exp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
-  return mp;
+    float a = cosThetaI * cosThetaO / v;
+    float b = sinThetaI * sinThetaO / v;
+    float mp = (v <= .1) ?
+    (std::exp(LogI0(a) - b - 1/v + 0.6931f + std::log(1 / (2*v)))) :
+    (std::exp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
+    return mp;  
 }
 
-inline const auto sigma_a = vec3f{3.35, 5.58, 10.96};
-
-vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
+vec3f eval_f(const vec3f &wo, const vec3f &wi) {
     // Compute hair coordinate system terms related to _wo_
     float sinThetaO = wo.x;
     float cosThetaO = SafeSqrt(1 - Sqr(sinThetaO));
@@ -1339,8 +1352,6 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
 
     // Compute $\gammat$ for refracted ray
     float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
-    // ---Compute h-----
-    float h = Clamp(-1+2*rand1f(rng),-1,1);
     float gammaO = SafeASin(h);
     float sinGammaT = h / etap;
     float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
@@ -1356,7 +1367,7 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
 
     // Evaluate hair BSDF
     float phi = phiI - phiO;
-    std::array<vec3f, pMax + 1> ap = Ap(cosThetaO, eta, rng, T);
+    std::array<vec3f, pMax + 1> ap = Ap(cosThetaO, eta, T);
     auto fsum = zero3f;
 
     //Vector v
@@ -1383,13 +1394,11 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
 		// <Compute sin θ i and cos θ i terms accounting for scales>
 			float sinThetaIp, cosThetaIp;
 			if (p == 0) {
-      //QUA NON S'È CAPITO SE È + O - O - E +
 			  sinThetaIp = sinThetaI * cos2kAlpha[1] + cosThetaI * sin2kAlpha[1];
 			  cosThetaIp = cosThetaI * cos2kAlpha[1] - sinThetaI * sin2kAlpha[1];
 			}
 			// <Handle remainder of p values for hair scale tilt>
 			if (p == 1) {
-				//Cambia segno se le cose si fanno avverse - mimmo ok        //cacca
 				sinThetaIp = sinThetaI * cos2kAlpha[0] - cosThetaI * sin2kAlpha[0];
 				cosThetaIp = cosThetaI * cos2kAlpha[0] + sinThetaI * sin2kAlpha[0];
 			}
@@ -1403,12 +1412,7 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
         }
         // Handle out-of-range $\cos \thetao$ from scale adjustment
         cosThetaIp = std::abs(cosThetaIp);
-        
-        //fillo
-        // fsum += Mp(cosThetaI, cosThetaIp, sinThetaI, sinThetaIp, v[p]) * ap[p] *
-        //       Np(phi, p, s, gammaO, gammaT);
-
-        //paper 
+    
         fsum += Mp(cosThetaIp, cosThetaO, sinThetaIp, sinThetaO, v[p]) * ap[p] *
               Np(phi, p, s, gammaO, gammaT);
     }
@@ -1417,12 +1421,9 @@ vec3f eval_f(const vec3f &wo, const vec3f &wi, rng_state& rng) {
     fsum += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
           ap[pMax] / (2.f * pif);
     if (AbsCosTheta(wi) > 0) fsum /= AbsCosTheta(wi);
-    // if(std::abs(wi.z) >0) fsum/= std::abs(wi.z);
-    // CHECK(!std::isinf(fsum.y()) && !std::isnan(fsum.y()));
     return fsum;
 }
-std::array<float, pMax + 1> ComputeApPdf(float cosThetaO,rng_state& rng)  {
-    float h = Clamp(-1+2*rand1f(rng),-1,1);
+std::array<float, pMax + 1> ComputeApPdf(float cosThetaO)  {
     float sinThetaO = SafeSqrt(1 - cosThetaO * cosThetaO);
     float sinThetaT = sinThetaO / eta;
     float cosThetaT = SafeSqrt(1 - Sqr(sinThetaT));
@@ -1431,11 +1432,6 @@ std::array<float, pMax + 1> ComputeApPdf(float cosThetaO,rng_state& rng)  {
     float cosGammaT = SafeSqrt(1 - Sqr(sinGammaT));
     float gammaT = SafeASin(sinGammaT); 
 
-    // auto T= zero3f;
-    // T.x = std::exp(-sigma_a.x * (2 * cosGammaT / cosThetaT));
-    // T.y = std::exp(-sigma_a.y * (2 * cosGammaT / cosThetaT));
-    // T.z = std::exp(-sigma_a.z * (2 * cosGammaT / cosThetaT));
-
     auto T= zero3f;
     auto n_sig = vec3f{sigma_a * (2 * cosGammaT / cosThetaT)};
 
@@ -1443,9 +1439,9 @@ std::array<float, pMax + 1> ComputeApPdf(float cosThetaO,rng_state& rng)  {
     T.y = std::exp(-n_sig.y);
     T.z = std::exp(-n_sig.z);
 
-    std::array<vec3f, pMax + 1> ap = Ap(cosThetaO, eta, rng, T);
+    std::array<vec3f, pMax + 1> ap = Ap(cosThetaO, eta, T);
     
-     std::array<float, pMax + 1> apPdf;
+    std::array<float, pMax + 1> apPdf;
 
     float sumY=0;
     const float YWeight[3] = {0.212671f, 0.715160f, 0.072169f};
@@ -1455,7 +1451,7 @@ std::array<float, pMax + 1> ComputeApPdf(float cosThetaO,rng_state& rng)  {
     }
     float acc = 0;
     for(int j= 0 ; j < pMax+1; j++){
-      acc = YWeight[0]*ap[j][0] + YWeight[1]*ap[j][0] +YWeight[2]*ap[j][0];
+      acc = YWeight[0]*ap[j][0] + YWeight[1]*ap[j][1] +YWeight[2]*ap[j][2];
       apPdf[j] = acc/sumY;
     }
     return apPdf;
@@ -1488,7 +1484,7 @@ inline float Radians(float deg) { return (pif / 180) * deg; }
 
 
 inline static vec3f Sample_f(const vec3f &wo, vec3f *wi, const vec2f &u2,
-                            float *pdf, rng_state& rng){
+                            float *pdf){
 
     //Stuff 
     float v[pMax+1];
@@ -1519,10 +1515,10 @@ inline static vec3f Sample_f(const vec3f &wo, vec3f *wi, const vec2f &u2,
 
     // Derive four random samples from _u2_
     // vec2f u[2] = {DemuxFloat(u2[0]), DemuxFloat(u2[1])};
-    vec2f u[2] = {DemuxFloat(rand1f(rng)), DemuxFloat(rand1f(rng))};
+    vec2f u[2] = { DemuxFloat(u2[0]), DemuxFloat(u2[1]) };
 
     // Determine which term $p$ to sample for hair scattering
-    std::array<float, pMax + 1> apPdf = ComputeApPdf(cosThetaO,rng);
+    std::array<float, pMax + 1> apPdf = ComputeApPdf(cosThetaO);
     int p;
     for (p = 0; p < pMax; ++p) {
         if (u[0][0] < apPdf[p]) break;
@@ -1559,7 +1555,6 @@ inline static vec3f Sample_f(const vec3f &wo, vec3f *wi, const vec2f &u2,
 
     // Compute $\gammat$ for refracted ray
     float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
-    float h = -1+2*rand1f(rng);
     float gammaO=SafeASin(h);
     float sinGammaT = h / etap;
     float gammaT = SafeASin(sinGammaT);
@@ -1575,40 +1570,39 @@ inline static vec3f Sample_f(const vec3f &wo, vec3f *wi, const vec2f &u2,
     *wi = vec3f{sinThetaI, cosThetaI * std::cos(phiI),
                    cosThetaI * std::sin(phiI)};
 
-    // Compute PDF for sampled hair scattering direction _wi_
-    *pdf = 0;
-    for (int p = 0; p < pMax; ++p) {
-        // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
-        float sinThetaOp, cosThetaOp;
-        if (p == 0) {
-            sinThetaOp = sinThetaO * cos2kAlpha[1] - cosThetaO * sin2kAlpha[1];
-            cosThetaOp = cosThetaO * cos2kAlpha[1] + sinThetaO * sin2kAlpha[1];
-        }
+    // // Compute PDF for sampled hair scattering direction _wi_
+    // *pdf = 0;
+    // for (int p = 0; p < pMax; ++p) {
+    //     // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
+    //     float sinThetaOp, cosThetaOp;
+    //     if (p == 0) {
+    //         sinThetaOp = sinThetaO * cos2kAlpha[1] - cosThetaO * sin2kAlpha[1];
+    //         cosThetaOp = cosThetaO * cos2kAlpha[1] + sinThetaO * sin2kAlpha[1];
+    //     }
 
-        // Handle remainder of $p$ values for hair scale tilt
-        else if (p == 1) {
-            sinThetaOp = sinThetaO * cos2kAlpha[0] + cosThetaO * sin2kAlpha[0];
-            cosThetaOp = cosThetaO * cos2kAlpha[0] - sinThetaO * sin2kAlpha[0];
-        } else if (p == 2) {
-            sinThetaOp = sinThetaO * cos2kAlpha[2] + cosThetaO * sin2kAlpha[2];
-            cosThetaOp = cosThetaO * cos2kAlpha[2] - sinThetaO * sin2kAlpha[2];
-        } else {
-            sinThetaOp = sinThetaO;
-            cosThetaOp = cosThetaO;
-        }
+    //     // Handle remainder of $p$ values for hair scale tilt
+    //     else if (p == 1) {
+    //         sinThetaOp = sinThetaO * cos2kAlpha[0] + cosThetaO * sin2kAlpha[0];
+    //         cosThetaOp = cosThetaO * cos2kAlpha[0] - sinThetaO * sin2kAlpha[0];
+    //     } else if (p == 2) {
+    //         sinThetaOp = sinThetaO * cos2kAlpha[2] + cosThetaO * sin2kAlpha[2];
+    //         cosThetaOp = cosThetaO * cos2kAlpha[2] - sinThetaO * sin2kAlpha[2];
+    //     } else {
+    //         sinThetaOp = sinThetaO;
+    //         cosThetaOp = cosThetaO;
+    //     }
 
-        // Handle out-of-range $\cos \thetao$ from scale adjustment
-        cosThetaOp = std::abs(cosThetaOp);
-        *pdf += Mp(cosThetaI, cosThetaOp, sinThetaI, sinThetaOp, v[p]) *
-                apPdf[p] * Np(dphi, p, s, gammaO, gammaT);
-    }
-    *pdf += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
-            apPdf[pMax] * (1 / (2 * pif));
-    // if (std::abs(wi->x) < .9999) CHECK_NEAR(*pdf, Pdf(wo, *wi), .01);
-    return eval_f(wo, *wi,rng);
+    //     // Handle out-of-range $\cos \thetao$ from scale adjustment
+    //     cosThetaOp = std::abs(cosThetaOp);
+    //     *pdf += Mp(cosThetaI, cosThetaOp, sinThetaI, sinThetaOp, v[p]) *
+    //             apPdf[p] * Np(dphi, p, s, gammaO, gammaT);
+    // }
+    // *pdf += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
+    //         apPdf[pMax] * (1 / (2 * pif));
+    return eval_f(wo, *wi);
 }
 
-float PDF(const vec3f &wo, const vec3f &wi, rng_state& rng) {
+float PDF(const vec3f &wo, const vec3f &wi) {
     //Stuff 
     float s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * Sqr(beta_n) +
                   5.372f * Pow<22>(beta_n));
@@ -1641,14 +1635,13 @@ float PDF(const vec3f &wo, const vec3f &wi, rng_state& rng) {
     // Compute $\gammat$ for refracted ray
 
     float etap = std::sqrt(eta * eta - Sqr(sinThetaO)) / cosThetaO;
-    float h = Clamp(-1+2*rand1f(rng),-1,1);
     float sinGammaT = h / etap;
     float gammaT = SafeASin(sinGammaT);
     
     float gammaO=SafeASin(h);
     // Compute PDF for $A_p$ terms
    
-    std::array<float, pMax + 1> apPdf = ComputeApPdf(cosThetaO,rng);
+    std::array<float, pMax + 1> apPdf = ComputeApPdf(cosThetaO);
 
     // Compute PDF sum for hair scattering events
     float phi = phiI - phiO;
@@ -1682,9 +1675,7 @@ float PDF(const vec3f &wo, const vec3f &wi, rng_state& rng) {
     pdf += Mp(cosThetaI, cosThetaO, sinThetaI, sinThetaO, v[pMax]) *
            apPdf[pMax] * (1 / (2 * pif));
     return pdf;
-    // return 0.1f;
 }
-
 
 // Path tracing.
 static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
@@ -1695,6 +1686,7 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
   auto ray          = ray_;
   auto volume_stack = std::vector<vsdf>{};
   auto hit          = false;
+  // rng_global = rng;
 
   // trace  path
   for (auto bounce = 0; bounce < params.bounces; bounce++) {
@@ -1739,12 +1731,12 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
       hit = true;
 
       // accumulate emission
-      radiance += weight * eval_emission(emission, normal, outgoing);
+      //radiance += weight * eval_emission(emission, normal, outgoing);
 
       // next direction
       auto incoming = zero3f;
       if(object->shape->lines.empty()){
-
+		radiance += weight * eval_emission(emission, normal, outgoing);
         if (!is_delta(brdf)) {
           if (rand1f(rng) < 0.5f) {
             incoming = sample_brdfcos(
@@ -1766,16 +1758,15 @@ static vec4f trace_path(const ptr::scene* scene, const ray3f& ray_,
         //render HAIR
         float pdf;
         incoming=zero3f;
+        h = -1+2*rand1f(rng);
         if (rand1f(rng) < 0.5f) {
-            Sample_f(outgoing,&incoming,rand2f(rng),&pdf,rng);
+            Sample_f(outgoing,&incoming,rand2f(rng),&pdf);
         } else {
-          incoming = sample_lights(
-              scene, position, rand1f(rng), rand1f(rng), rand2f(rng));
+         incoming = sample_lights(scene, position, rand1f(rng), rand1f(rng), rand2f(rng));
         }
-        // weight *= eval_f(outgoing,incoming,rng)*std::abs(dot(normal,incoming) / 
-             weight *= eval_f(outgoing,incoming,rng) / 
-                  (0.5f * PDF(outgoing,incoming,rng) +
-                      0.5f * sample_lights_pdf(scene, position, incoming));
+			weight *= eval_f(outgoing,incoming) / 
+                 		  (0.5f * PDF(outgoing,incoming) +
+                      			0.5f * sample_lights_pdf(scene, position, incoming));
       }
       
 

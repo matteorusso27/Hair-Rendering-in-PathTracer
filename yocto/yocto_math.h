@@ -218,10 +218,6 @@ inline const float SqrtPiOver8 = 0.626657069;
 inline const float eta=1.55;
 const int alpha=2;
 
-//Betas
-inline const float beta_n= 0.3;
-inline const float beta_m= 0.125;
-
 inline const auto int_max = std::numeric_limits<int>::max();
 inline const auto int_min = std::numeric_limits<int>::lowest();
 inline const auto flt_max = std::numeric_limits<float>::max();
@@ -319,12 +315,6 @@ struct vec4f {
 inline const auto zero2f = vec2f{0, 0};
 inline const auto zero3f = vec3f{0, 0, 0};
 inline const auto zero4f = vec4f{0, 0, 0, 0};
-
-//Sigma values
-// inline const auto sigma_a = vec3f{0.1, 0.2, 0.5}; //biondo
-// inline const auto sigma_a = vec3f{0.97, 0.95, 0.20}; //biondo
-// inline const auto sigma_a = vec3f{0.84, 1.39, 2.74};//marrone
-// inline const auto sigma_a = vec3f{3.35, 5.58, 10.96}; //nero
 
 // Element access
 inline vec3f&       xyz(vec4f& a);
