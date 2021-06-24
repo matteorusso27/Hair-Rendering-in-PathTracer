@@ -4,3 +4,4 @@ This project was done extending the original yocoto libray (https://github.com/x
 The main aim was to recreate the rendering of the hair scattered model cited in Matt Pharr's paper (https://www.pbrt.org/hair.pdf) on the
 course provided raytracer. In the following some achieved results:
 
+![alt text]https://github.com/matteorusso27/libs/blob/master/Results/black_paper_floor.jpg
