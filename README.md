@@ -123,11 +123,11 @@ l = total segment length in terms of the hair diameter
 The paper presents 3 different values for the sigma, one for blonde hair, one for brown hair and one for black hair.
 We reproduced the experiments on the hairballs and on the models provided by the professor and here is the result.
 
-<img src="./out/HairBalls/blonde_paper_floor.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_paper_floor.jpg)
 sigma = {0.06,0.1,0.2} 
-<img src="./out/HairBalls/brown_paper_floor.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_paper_floor.jpg)
 sigma = {0.84, 1.39, 2.74} 
-<img src="./out/HairBalls/black_paper_floor.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/black_paper_floor.jpg)
 sigma = {3.35, 5.58, 10.96} 
 
 In all cases we have:
@@ -139,12 +139,12 @@ Resolution = 1280
 However, since the sigma for the blonde hair seems to be too bright in our implementation,
 we decided to change it to {0.06,0.14,0.3}, trying to soften the effect of the light on the object.
 The two roughness have been changed as well, now we have beta_n=beta_m= 0.1
-<img src="./out/HairBalls/blonde_01_floor.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_01_floor.jpg)
 
 We also included the black hairball with different values of roughnesses. In this case,
 we employed the same used in the "revisited" blonde hairball.
 
-<img src="./out/HairBalls/brown_01_floor.png" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_01_floor.jpg)
 beta_n = 0.1
 beta_m = 0.1
 sigma = {0.84, 1.39, 2.74} 
@@ -155,11 +155,11 @@ Now, we propose the rendering on the hair models provided by the professor
 
 Natural Hair
 
-<img src="./out/natural/natural_blonde.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_blonde.jpg)
 sigma = {0.06,0.14,0.3}
-<img src="./out/natural/natural_brown.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_brown.jpg)
 {0.84, 1.39, 2.74} 
-<img src="./out/natural/natural_black.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_black.jpg)
 {3.35, 5.58, 10.96} 
 
 In all cases we have:
@@ -170,11 +170,11 @@ Resolution = 1280
 
 Straight Hair
 
-<img src="./out/straight/straight_blonde.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_blonde.jpg)
 sigma = {0.06,0.14,0.3}
-<img src="./out/straight/straight_brown.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_brown.jpg)
 {0.84, 1.39, 2.74} 
-<img src="./out/straight/straight_black.jpg" height = "400" width="900"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_black.jpg)
 {3.35, 5.58, 10.96} 
 
 In all cases we have:
@@ -188,13 +188,13 @@ Resolution = 1280
 These are the rendering times for the Hairballs
 
 Time for the Blonde hairball
-<img src="./out/HairBalls/performance_hairball/blonde_hairball_performance.png" height = "120" width="720"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_hairball_performance.png)
 
 Time for the Brown hairball
-<img src="./out/HairBalls/performance_hairball/brown_hairball_performance.png" height = "120" width="720"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_hairball_performance.png)
 
 Time for the Black Hairball
-<img src="./out/HairBalls/performance_hairball/black_hairball_performance.png" height = "120" width="720"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/black_hairball_performance.png)
 
 As we can see, the black hairball has the shorter rendering time; we think this is due to the high absorption 
 coefficient of the black, which turns into having less time in rendering hairs of black color.
@@ -204,13 +204,13 @@ have high rendering times.
 Let's see the rendering times for the Straight Hair
 
 Time for Straight Blonde Hair
-<img src="./out/straight/performance_straight/straight_blonde_performance.png" height = "120" width="720"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_blonde_performance.png)
 
 Time for Straight Brown Hair
-<img src="./out/straight/performance_straight/straight_brown_performance.png" height = "120" width="720"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_brown_performance.png)
 
 Time for Straight Black Hair
-<img src="./out/straight/performance_straight/straight_black_performance.png" height = "120" width="720"/>
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_black_performance.png)
 
 As discussed earlier, the rendering times for the black are shorter than the others.
 
