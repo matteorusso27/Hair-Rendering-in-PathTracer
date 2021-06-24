@@ -1,39 +1,3 @@
-# Hair Rendering project realized for the Fundamentals of Computer Graphics course(AY 2019/2020) in Università degli Studi di Roma La Sapienza
-This project was done extending the original yocto libray (https://github.com/xelatihy/yocto-gl) owned by Professor Fabio Pellacini.
-
-The main aim was to recreate the rendering of the hair scattered model cited in Matt Pharr's paper (https://www.pbrt.org/hair.pdf) on the
-course provided raytracer. In the following some achieved results:
-
-Black HairBall<br />
-![alt text](https://github.com/matteorusso27/libs/blob/master/Results/black_paper_floor.jpg)
-
-Blonde HairBall v1
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_01_floor.jpg)
-
-Blonde HairBall v2
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_paper_floor.jpg)
-
-Brown HairBall v1
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_paper_floor.jpg)
-
-Curly Black Hair
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_black.jpg)
-
-Curly Blonde Hair
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_blonde.jpg)
-
-Curly Brown Hair
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_brown.jpg)
-
-Straight Black Hair
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_black.jpg)
-
-Straight Blonde Hair
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_blonde.jpg)
-
-Straight Brown Hair
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_brown.jpg)
-
 # Hair Scattering Project
 Developed by Matteo Russo 1664715 and Paolo Tarantino 1666228 realized for the Fundamentals of Computer Graphics 
 course(AY 2019/2020) in Università degli Studi di Roma La Sapienza.
@@ -123,12 +87,15 @@ l = total segment length in terms of the hair diameter
 The paper presents 3 different values for the sigma, one for blonde hair, one for brown hair and one for black hair.
 We reproduced the experiments on the hairballs and on the models provided by the professor and here is the result.
 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_paper_floor.jpg)
 sigma = {0.06,0.1,0.2} 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_paper_floor.jpg)
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/blonde_paper_floor.jpg)
+
 sigma = {0.84, 1.39, 2.74} 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/black_paper_floor.jpg)
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_paper_floor.jpg)
+
 sigma = {3.35, 5.58, 10.96} 
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/black_paper_floor.jpg)
+
 
 In all cases we have:
 beta_n = 0.3
@@ -144,23 +111,26 @@ The two roughness have been changed as well, now we have beta_n=beta_m= 0.1
 We also included the black hairball with different values of roughnesses. In this case,
 we employed the same used in the "revisited" blonde hairball.
 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_01_floor.jpg)
 beta_n = 0.1
 beta_m = 0.1
 sigma = {0.84, 1.39, 2.74} 
 Samples ppixel = 1080
 Resolution = 1280
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/brown_01_floor.jpg)
+
 
 Now, we propose the rendering on the hair models provided by the professor
 
 Natural Hair
 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_blonde.jpg)
 sigma = {0.06,0.14,0.3}
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_brown.jpg)
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_blonde.jpg)
+
 {0.84, 1.39, 2.74} 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_black.jpg)
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_brown.jpg)
+
 {3.35, 5.58, 10.96} 
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/natural_black.jpg)
 
 In all cases we have:
 beta_n = 0.3
@@ -170,12 +140,15 @@ Resolution = 1280
 
 Straight Hair
 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_blonde.jpg)
 sigma = {0.06,0.14,0.3}
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_brown.jpg)
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_blonde.jpg)
+
 {0.84, 1.39, 2.74} 
-![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_black.jpg)
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_brown.jpg)
+
 {3.35, 5.58, 10.96} 
+![alt_text](https://github.com/matteorusso27/libs/blob/master/Results/straight_black.jpg)
+
 
 In all cases we have:
 beta_n = 0.3
