@@ -4,7 +4,7 @@ course(AY 2019/2020) in Università degli Studi di Roma La Sapienza.
 
 # Introduction
 The project has the goal to provide to the yocto library the hair scattering implementation
-presented in Matt Pharr's paper, one of the author of the pbr book. The yocto libray (https://github.com/xelatihy/yocto-gl) is owned 
+presented in Matt Pharr's paper, one of the author of the pbrt book. The yocto libray (https://github.com/xelatihy/yocto-gl) is owned 
 by our Professor Fabio Pellacini.
 
 The yocto renderer treats hair as a surface. While this could be a fair approximation
