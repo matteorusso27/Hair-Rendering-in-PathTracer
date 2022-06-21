@@ -1,4 +1,4 @@
-# Hair Scattering Project
+# Hair Rendering in PathTracer
 Developed by Matteo Russo 1664715 and Paolo Tarantino 1666228 realized for the Fundamentals of Computer Graphics 
 course(AY 2019/2020) in Università degli Studi di Roma La Sapienza.
 
